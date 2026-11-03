@@ -147,6 +147,11 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(12.dp))
                     if (tab == 5) {
                         ItemCatalog(Modifier.weight(1f))
+                    } else if (tab == 6) {
+                        NativeItemCatalog(onEquip = { item ->
+                            gear += item
+                            tab = 0
+                        }, modifier = Modifier.weight(1f))
                     } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         when (tab) {
                             0 -> {
