@@ -28,7 +28,7 @@ import org.json.JSONObject
 
 private val classes = listOf("Barbarian", "Druid", "Necromancer", "Rogue", "Sorcerer", "Spiritborn", "Paladin")
 private val slots = listOf("Weapon", "Helm", "Chest", "Gloves", "Pants", "Boots", "Amulet", "Rings")
-private val tabs = listOf("Forge", "Advisor", "Codex", "Scanner", "Vault", "Items")
+private val tabs = listOf("Forge", "Advisor", "Codex", "Scanner", "Vault", "Items", "Native")
 private val gold = Color(0xFFE0B76D)
 private val dark = Color(0xFF111014)
 private val surfaceDark = Color(0xFF242026)
