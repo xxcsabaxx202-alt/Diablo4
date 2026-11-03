@@ -1,0 +1,43 @@
+name: Diablo IV patch monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * *'
+permissions:
+  contents: read
+  issues: write
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Blizzard official patch notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import html, re, urllib.request, os, subprocess
+          url = "https://news.blizzard.com/en-us/article/24295395/diablo-iv-patch-notes"
+          req = urllib.request.Request(url, headers={"User-Agent": "BuildForgePatchMonitor/0.3"})
+          with urllib.request.urlopen(req, timeout=25) as response:
+              page = html.unescape(response.read().decode("utf-8", "replace"))
+          clean = re.sub(r"<[^>]+>", " ", page)
+          clean = re.sub(r"\s+", " ", clean)
+          match = re.search(r"\b(3\.\d+\.\d+)\s+Build\s*#(\d+)", clean)
+          if not match:
+              raise SystemExit("Cannot verify patch version; refusing to guess.")
+          version, build = match.groups()
+          print(f"Official detected patch: {version} build {build}")
+          baseline = ("3.2.4", "74043")
+          if (version, build) == baseline:
+              print("Baseline unchanged.")
+              raise SystemExit(0)
+          title = f"Review Diablo IV patch {version} build {build}"
+          existing = subprocess.run(["gh", "issue", "list", "--state", "all", "--search", title, "--json", "title"], capture_output=True, text=True, check=True).stdout
+          if title in existing:
+              print("Review issue already exists.")
+          else:
+              subprocess.run(["gh", "issue", "create", "--title", title,
+                  "--body", f"Official patch notes: {url}\n\nDetected version: {version} build {build}.\n\nReview changes to items, skills, class balance and patch-scoped build data before updating app recommendations. PTR must remain separate from live data."], check=True)
+          PY
