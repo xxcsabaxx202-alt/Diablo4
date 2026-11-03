@@ -8,6 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -19,7 +24,36 @@ import org.json.JSONObject
 
 private val classes = listOf("Barbarian", "Druid", "Necromancer", "Rogue", "Sorcerer", "Spiritborn", "Paladin")
 private val slots = listOf("Weapon", "Helm", "Chest", "Gloves", "Pants", "Boots", "Amulet", "Rings")
-private val tabs = listOf("Planner", "Advisor", "Guide", "Image", "Saved")
+private val tabs = listOf("Forge", "Advisor", "Codex", "Scanner", "Vault")
+private val gold = Color(0xFFE0B76D)
+private val dark = Color(0xFF111014)
+private val surfaceDark = Color(0xFF242026)
+private val rarityColors = mapOf(
+    "Common" to Color(0xFFB9B9B9), "Magic" to Color(0xFF689DEA),
+    "Rare" to Color(0xFFF4CD68), "Legendary" to Color(0xFFDE8C46),
+    "Unique" to Color(0xFFD3A37C), "Mythic" to Color(0xFFB78CE5)
+)
+@Composable private fun ItemCard(name: String, rarity: String) {
+    val tint = rarityColors[rarity] ?: gold
+    Card(
+        colors = CardDefaults.cardColors(containerColor = surfaceDark),
+        border = BorderStroke(1.dp, tint),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
+    ) {
+        Row(Modifier.padding(12.dp)) {
+            Box(
+                Modifier.size(56.dp).background(tint.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) { Text("✦", color = tint, style = MaterialTheme.typography.headlineLarge) }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(name.ifBlank { "Item preview" }, color = tint, fontWeight = FontWeight.Bold)
+                Text(rarity, color = Color.LightGray)
+            }
+        }
+    }
+}
 
 private data class BuildDraft(
     val name: String,
@@ -71,7 +105,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val appContext = applicationContext
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = gold, background = dark, surface = surfaceDark)) {
                 var tab by remember { mutableStateOf(0) }
                 var hero by remember { mutableStateOf("Sorcerer") }
                 var name by remember { mutableStateOf("") }
@@ -81,6 +115,8 @@ class MainActivity : ComponentActivity() {
                 var goal by remember { mutableStateOf("") }
                 var selectedImage by remember { mutableStateOf<Uri?>(null) }
                 var notice by remember { mutableStateOf("") }
+                var itemName by remember { mutableStateOf("") }
+                var itemRarity by remember { mutableStateOf("Legendary") }
                 val saved = remember { mutableStateListOf<BuildDraft>().apply { addAll(loadBuilds(appContext)) } }
                 val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
                     selectedImage = it
@@ -91,8 +127,13 @@ class MainActivity : ComponentActivity() {
                     tab = 0
                 }
                 Column(Modifier.fillMaxSize().padding(16.dp)) {
-                    Text("BUILDFORGE AI", style = MaterialTheme.typography.headlineMedium)
-                    Text("Diablo IV companion • offline preview", style = MaterialTheme.typography.bodySmall)
+                    Text("✦ BUILDFORGE", color = gold, fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
+                    Text("SANCTUARY WORKSHOP • DIABLO IV", color = Color.LightGray)
+                    Text("Reference patch: 3.2.4 • not live verified", color = gold, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            Uri.parse("https://news.blizzard.com/en-us/article/24295395/diablo-iv-patch-notes")))
+                    }) { Text("Official patch notes") }
                     Spacer(Modifier.height(10.dp))
                     ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
                         tabs.forEachIndexed { index, label ->
@@ -103,6 +144,7 @@ class MainActivity : ComponentActivity() {
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         when (tab) {
                             0 -> {
+                                Text("HERO FORGE", color = gold, style = MaterialTheme.typography.titleLarge)
                                 Text("Character class", style = MaterialTheme.typography.titleMedium)
                                 classes.forEach { option ->
                                     Row {
@@ -112,7 +154,31 @@ class MainActivity : ComponentActivity() {
                                 }
                                 OutlinedTextField(name, { name = it }, label = { Text("Build name") }, modifier = Modifier.fillMaxWidth())
                                 OutlinedTextField(skill, { skill = it }, label = { Text("Skills and passives") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-                                OutlinedTextField(gear, { gear = it }, label = { Text("Equipment, uniques, aspects") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                                Text("ITEM WORKSHOP", color = gold, style = MaterialTheme.typography.titleMedium)
+                                OutlinedTextField(itemName, { itemName = it }, label = { Text("Item name") }, modifier = Modifier.fillMaxWidth())
+                                Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
+                                    rarityColors.keys.forEach { rarity ->
+                                        FilterChip(
+                                            selected = itemRarity == rarity,
+                                            onClick = { itemRarity = rarity },
+                                            label = { Text(rarity) },
+                                            modifier = Modifier.padding(end = 6.dp)
+                                        )
+                                    }
+                                }
+                                ItemCard(itemName, itemRarity)
+                                Button(onClick = {
+                                    if (itemName.isNotBlank()) {
+                                        gear += (if (gear.isBlank()) "" else "\n") + "$itemRarity | $itemName"
+                                        itemName = ""
+                                    }
+                                }, enabled = itemName.isNotBlank()) { Text("Add to equipment") }
+                                OutlinedTextField(gear, { gear = it }, label = { Text("Equipment, uniques, aspects and affixes") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                                gear.lines().filter { it.contains(" | ") }.forEach { line ->
+                                    val parts = line.split(" | ", limit = 2)
+                                    if (parts.size == 2) ItemCard(parts[1], parts[0])
+                                }
+                                Text("Rarity icons are illustrative. Official item images and validated stats require a licensed or permitted asset catalog.", style = MaterialTheme.typography.bodySmall)
                                 Text("Suggested equipment slots: " + slots.joinToString(", "), style = MaterialTheme.typography.bodySmall)
                                 OutlinedTextField(paragon, { paragon = it }, label = { Text("Paragon boards and glyphs") }, minLines = 2, modifier = Modifier.fillMaxWidth())
                                 OutlinedTextField(goal, { goal = it }, label = { Text("Goal (Pit, bosses, leveling...)") }, modifier = Modifier.fillMaxWidth())
@@ -126,7 +192,7 @@ class MainActivity : ComponentActivity() {
                                 if (notice.isNotBlank()) Text(notice)
                             }
                             1 -> {
-                                Text("Build advisor", style = MaterialTheme.typography.titleLarge)
+                                Text("BUILD ADVISOR", color = gold, style = MaterialTheme.typography.titleLarge)
                                 Text("Rule-based offline feedback. No AI service connected yet.")
                                 advice(hero, skill, gear, paragon, goal).forEach { suggestion ->
                                     Spacer(Modifier.height(8.dp))
@@ -134,7 +200,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             2 -> {
-                                Text("Endgame checklist", style = MaterialTheme.typography.titleLarge)
+                                Text("SANCTUARY CODEX", color = gold, style = MaterialTheme.typography.titleLarge)
                                 listOf(
                                     "Check the current season and patch before following a build.",
                                     "Review resistance, armor and defensive skills for your difficulty.",
@@ -145,7 +211,7 @@ class MainActivity : ComponentActivity() {
                                 Text("Guidance is general; current patch-specific data is not yet integrated.")
                             }
                             3 -> {
-                                Text("Screenshot workspace", style = MaterialTheme.typography.titleLarge)
+                                Text("ITEM SCANNER", color = gold, style = MaterialTheme.typography.titleLarge)
                                 Text("Select a PS5 screenshot or item image for future analysis.")
                                 Spacer(Modifier.height(10.dp))
                                 Button(onClick = { picker.launch("image/*") }) { Text("Choose image") }
@@ -153,7 +219,7 @@ class MainActivity : ComponentActivity() {
                                 Text("Automatic OCR and AI item recognition are not implemented in this version.")
                             }
                             4 -> {
-                                Text("Saved builds", style = MaterialTheme.typography.titleLarge)
+                                Text("BUILD VAULT", color = gold, style = MaterialTheme.typography.titleLarge)
                                 if (saved.isEmpty()) Text("No saved builds yet.")
                                 saved.toList().forEachIndexed { index, draft ->
                                     ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
