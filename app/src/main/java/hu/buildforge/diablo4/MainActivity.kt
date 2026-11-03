@@ -3,6 +3,9 @@ package hu.buildforge.diablo4
 import android.content.Context
 import android.os.Bundle
 import android.net.Uri
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,7 +28,7 @@ import org.json.JSONObject
 
 private val classes = listOf("Barbarian", "Druid", "Necromancer", "Rogue", "Sorcerer", "Spiritborn", "Paladin")
 private val slots = listOf("Weapon", "Helm", "Chest", "Gloves", "Pants", "Boots", "Amulet", "Rings")
-private val tabs = listOf("Forge", "Advisor", "Codex", "Scanner", "Vault")
+private val tabs = listOf("Forge", "Advisor", "Codex", "Scanner", "Vault", "Items")
 private val gold = Color(0xFFE0B76D)
 private val dark = Color(0xFF111014)
 private val surfaceDark = Color(0xFF242026)
@@ -142,7 +145,9 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    if (tab == 5) {
+                        ItemCatalog(Modifier.weight(1f))
+                    } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         when (tab) {
                             0 -> {
                                 Text("HERO FORGE", color = gold, style = MaterialTheme.typography.titleLarge)
@@ -244,5 +249,56 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+@Composable private fun ItemCatalog(modifier: Modifier = Modifier) {
+    var source by remember { mutableStateOf("D4GG") }
+    var loadError by remember { mutableStateOf(false) }
+    val urls = mapOf(
+        "D4GG" to "https://d4gg.gg/en/diablo4/database/",
+        "D4Guides" to "https://d4guides.gg/en/database/items",
+        "D4Life" to "https://diablo4.life/database/uniques"
+    )
+    Column(modifier) {
+        Text("ITEM CODEX", color = gold, style = MaterialTheme.typography.titleLarge)
+        Text("Live community catalogs • requires internet", style = MaterialTheme.typography.bodySmall)
+        Text("Third-party information. Item values and patch coverage must be checked against Blizzard patch notes.", style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
+            urls.keys.forEach { key ->
+                FilterChip(
+                    selected = source == key,
+                    onClick = { source = key; loadError = false },
+                    label = { Text(key) },
+                    modifier = Modifier.padding(end = 6.dp)
+                )
+            }
+        }
+        val url = urls[source] ?: return@Column
+        if (loadError) {
+            Text("The catalog could not load. Check your connection or open it in your browser.")
+        }
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    webViewClient = object : WebViewClient() {
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: android.webkit.WebResourceRequest?,
+                            error: android.webkit.WebResourceError?
+                        ) {
+                            if (request?.isForMainFrame == true) loadError = true
+                        }
+                    }
+                    loadUrl(url)
+                }
+            },
+            update = { webView ->
+                if (webView.url != url) webView.loadUrl(url)
+            },
+            modifier = Modifier.fillMaxWidth().weight(1f)
+        )
     }
 }
